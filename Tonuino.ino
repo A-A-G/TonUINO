@@ -57,6 +57,16 @@ static void nextTrack(uint16_t track);
 uint8_t voiceMenu(int numberOfOptions, int startMessage, int messageOffset,
                   bool preview = false, int previewFromFolder = 0, int defaultValue = 0, bool exitWithLongPress = false);
 bool isPlaying();
+bool readCard(nfcTagObject *nfcTag);
+void dump_byte_array(byte *buffer, byte bufferSize);
+void resetCard();
+void setupCard();
+void writeCard(nfcTagObject nfcTag);
+void adminMenu();
+void playShortCut(uint8_t shortCut);
+void setstandbyTimer();
+void setupFolder(folderSettings * theFolder);
+void randomSeed(unsigned long x);
 bool knownCard = false;
 
 // implement a notification class,
@@ -391,7 +401,8 @@ void setup() {
   delay(2000);
   volume = mySettings.initVolume;
   mp3.setVolume(volume);
-  mp3.setEq(mySettings.eq - 1);
+  DfMp3_Eq selectedEqualizer = static_cast<DfMp3_Eq> (mySettings.eq-1);
+  mp3.setEq(selectedEqualizer);
   // Fix für das Problem mit dem Timeout (ist jetzt in Upstream daher nicht mehr nötig!)
   //mySoftwareSerial.setTimeout(10000);
 
@@ -707,7 +718,8 @@ void adminMenu() {
   else if (subMenu == 5) {
     // EQ
     mySettings.eq = voiceMenu(6, 920, 920, false, false, mySettings.eq);
-    mp3.setEq(mySettings.eq - 1);
+    DfMp3_Eq selectedEqualizer = static_cast<DfMp3_Eq> (mySettings.eq-1);
+    mp3.setEq(selectedEqualizer);
   }
   else if (subMenu == 6) {
     // create master card
