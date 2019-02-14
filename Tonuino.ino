@@ -6,6 +6,8 @@
 #include <SoftwareSerial.h>
 #include <avr/sleep.h>
 
+static const uint32_t cardCookie = 322417479;
+
 // DFPlayer Mini
 SoftwareSerial mySoftwareSerial(2, 3); // RX, TX
 uint16_t numTracksInFolder;
@@ -126,7 +128,7 @@ void writeSettingsToFlash() {
 
 void resetSettings() {
   Serial.println(F("=== resetSettings()"));
-  mySettings.cookie = 322417479;
+  mySettings.cookie = cardCookie;
   mySettings.version = 1;
   mySettings.maxVolume = 25;
   mySettings.minVolume = 5;
@@ -150,7 +152,7 @@ void loadSettingsFromFlash() {
   Serial.println(F("=== loadSettingsFromFlash()"));
   int address = sizeof(myFolder->folder) * 100;
   EEPROM.get(address, mySettings);
-  if (mySettings.cookie != 322417479)
+  if (mySettings.cookie != cardCookie)
     resetSettings();
   migradeSettings(mySettings.version);
 
@@ -395,6 +397,8 @@ void setup() {
 
   // DFPlayer Mini initialisieren
   mp3.begin();
+  // Zwei Sekunden warten bis der DFPlayer Mini initialisiert ist
+  delay(2000);
   volume = mySettings.initVolume;
   mp3.setVolume(volume);
   DfMp3_Eq selectedEqualizer = static_cast<DfMp3_Eq> (mySettings.eq-1);
@@ -506,7 +510,10 @@ void playFolder() {
   if (myFolder->mode == 5) {
     Serial.println(F("Hörbuch Modus -> kompletten Ordner spielen und "
                      "Fortschritt merken"));
-    currentTrack = max(1, EEPROM.read(myFolder->folder));
+    currentTrack = EEPROM.read(myFolder->folder);
+    if (currentTrack == 0 || currentTrack > numTracksInFolder) {
+      currentTrack = 1;
+    }
     mp3.playFolderTrack(myFolder->folder, currentTrack);
   }
   // Spezialmodus Von-Bin: Hörspiel: eine zufällige Datei aus dem Ordner
@@ -667,8 +674,8 @@ void loop() {
 
   if (readCard(&myCard) == true) {
     // make random a little bit more "random"
-    randomSeed(millis());
-    if (myCard.cookie == 322417479 && myFolder->folder != 0 && myFolder->mode != 0) {
+    randomSeed(millis() + random(1000));
+    if (myCard.cookie == cardCookie && myFolder->folder != 0 && myFolder->mode != 0) {
       playFolder();
     }
 
@@ -735,7 +742,7 @@ void adminMenu() {
     // Create Cards for Folder
     // Ordner abfragen
     nfcTagObject tempCard;
-    tempCard.cookie = 322417479;
+    tempCard.cookie = cardCookie;
     tempCard.version = 1;
     tempCard.nfcFolderSettings.mode = 4;
     tempCard.nfcFolderSettings.folder = voiceMenu(99, 301, 0, true);
@@ -945,7 +952,6 @@ void setupCard() {
 }
 
 bool readCard(nfcTagObject * nfcTag) {
-  bool returnValue = true;
   // Show some details of the PICC (that is: the tag/card)
   Serial.print(F("Card UID:"));
   dump_byte_array(mfrc522.uid.uidByte, mfrc522.uid.size);
@@ -976,10 +982,9 @@ bool readCard(nfcTagObject * nfcTag) {
   }
 
   if (status != MFRC522::STATUS_OK) {
-    returnValue = false;
     Serial.print(F("PCD_Authenticate() failed: "));
     Serial.println(mfrc522.GetStatusCodeName(status));
-    return returnValue;
+    return false;
   }
 
   // Show the whole sector as it currently is
@@ -997,9 +1002,9 @@ bool readCard(nfcTagObject * nfcTag) {
     Serial.println(F(" ..."));
     status = (MFRC522::StatusCode)mfrc522.MIFARE_Read(blockAddr, buffer, &size);
     if (status != MFRC522::STATUS_OK) {
-      returnValue = false;
       Serial.print(F("MIFARE_Read() failed: "));
       Serial.println(mfrc522.GetStatusCodeName(status));
+      return false;
     }
   }
   else if (piccType == MFRC522::PICC_TYPE_MIFARE_UL )
@@ -1009,33 +1014,33 @@ bool readCard(nfcTagObject * nfcTag) {
 
     status = (MFRC522::StatusCode)mfrc522.MIFARE_Read(8, buffer2, &size2);
     if (status != MFRC522::STATUS_OK) {
-      returnValue = false;
       Serial.print(F("MIFARE_Read_1() failed: "));
       Serial.println(mfrc522.GetStatusCodeName(status));
+      return false;
     }
     memcpy(buffer, buffer2, 4);
 
     status = (MFRC522::StatusCode)mfrc522.MIFARE_Read(9, buffer2, &size2);
     if (status != MFRC522::STATUS_OK) {
-      returnValue = false;
       Serial.print(F("MIFARE_Read_2() failed: "));
       Serial.println(mfrc522.GetStatusCodeName(status));
+      return false;
     }
     memcpy(buffer + 4, buffer2, 4);
 
     status = (MFRC522::StatusCode)mfrc522.MIFARE_Read(10, buffer2, &size2);
     if (status != MFRC522::STATUS_OK) {
-      returnValue = false;
       Serial.print(F("MIFARE_Read_3() failed: "));
       Serial.println(mfrc522.GetStatusCodeName(status));
+      return false;
     }
     memcpy(buffer + 8, buffer2, 4);
 
     status = (MFRC522::StatusCode)mfrc522.MIFARE_Read(11, buffer2, &size2);
     if (status != MFRC522::STATUS_OK) {
-      returnValue = false;
       Serial.print(F("MIFARE_Read_4() failed: "));
       Serial.println(mfrc522.GetStatusCodeName(status));
+      return false;
     }
     memcpy(buffer + 12, buffer2, 4);
   }
@@ -1061,7 +1066,7 @@ bool readCard(nfcTagObject * nfcTag) {
 
   myFolder = &nfcTag->nfcFolderSettings;
 
-  return returnValue;
+  return true;
 }
 
 void writeCard(nfcTagObject nfcTag) {
