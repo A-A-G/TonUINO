@@ -52,10 +52,10 @@ adminSettings mySettings;
 nfcTagObject myCard;
 folderSettings *myFolder;
 unsigned long sleepAtMillis = 0;
+bool knownCard = false;
 
 static void nextTrack(uint16_t track);
-uint8_t voiceMenu(int numberOfOptions, int startMessage, int messageOffset,
-                  bool preview = false, int previewFromFolder = 0, int defaultValue = 0, bool exitWithLongPress = false);
+uint8_t voiceMenu(int numberOfOptions, int startMessage, int messageOffset, bool preview = false, int previewFromFolder = 0, int defaultValue = 0, bool exitWithLongPress = false);
 bool isPlaying();
 bool readCard(nfcTagObject *nfcTag);
 void dump_byte_array(byte *buffer, byte bufferSize);
@@ -67,11 +67,9 @@ void playShortCut(uint8_t shortCut);
 void setstandbyTimer();
 void setupFolder(folderSettings * theFolder);
 void randomSeed(unsigned long x);
-bool knownCard = false;
 
 // implement a notification class,
 // its member methods will get called
-//
 class Mp3Notify {
   public:
     static void OnError(uint16_t errorCode) {
@@ -308,6 +306,7 @@ MFRC522::StatusCode status;
 #define buttonUp A1
 #define buttonDown A2
 #define busyPin 4
+#define onPin 6
 #define shutdownPin 7
 
 #define LONG_PRESS 1000
@@ -315,6 +314,7 @@ MFRC522::StatusCode status;
 Button pauseButton(buttonPause);
 Button upButton(buttonUp);
 Button downButton(buttonDown);
+
 bool ignorePauseButton = false;
 bool ignoreUpButton = false;
 bool ignoreDownButton = false;
@@ -341,6 +341,7 @@ void checkStandbyAtMillis() {
     Serial.println(F("=== power off!"));
     // enter sleep state
     digitalWrite(shutdownPin, HIGH);
+    digitalWrite(onPin, LOW);
     delay(500);
 
     // http://discourse.voss.earth/t/intenso-s10000-powerbank-automatische-abschaltung-software-only/805
@@ -420,6 +421,8 @@ void setup() {
   pinMode(buttonDown, INPUT_PULLUP);
   pinMode(shutdownPin, OUTPUT);
   digitalWrite(shutdownPin, LOW);
+  pinMode(onPin, OUTPUT);
+  digitalWrite(onPin, HIGH);
 
   // RESET --- ALLE DREI KNÖPFE BEIM STARTEN GEDRÜCKT HALTEN -> alle EINSTELLUNGEN werden gelöscht
   if (digitalRead(buttonPause) == LOW && digitalRead(buttonUp) == LOW &&
@@ -731,7 +734,7 @@ void adminMenu() {
   }
   else if (subMenu == 8) {
     switch (voiceMenu(5, 960, 960)) {
-      case 1: mySettings.standbyTimer = 5; break;
+      case 1: mySettings.standbyTimer = 1; break;
       case 2: mySettings.standbyTimer = 15; break;
       case 3: mySettings.standbyTimer = 30; break;
       case 4: mySettings.standbyTimer = 60; break;
