@@ -1,6 +1,9 @@
 # TonUINO
 Die DIY Musikbox (nicht nur) für Kinder
 
+# Eclipse Version
+
+Walkthrough: http://www.altehippe.de/WalkthroughV2.pdf
 
 # Change Log
 
